@@ -1,0 +1,3 @@
+警告信息：
+In apply(clean_pheno, 2, as.numeric) : 强制改变过程中产生了NA
+警告多于50个(用warnings()来显示第一个到第50个)

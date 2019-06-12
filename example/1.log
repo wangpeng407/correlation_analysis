@@ -1,0 +1,8 @@
+Vars contain >= 10% NA: BNP Spironolactone 
+
+Vars with non-variatiton:  
+
+Binary vars:  gender CHD ARB CCB βblocker Diuretics Digoxin Nitrates Aspirin Clopidogrel Warfarin Statin 
+
+Numerical vars:  age Height Weight BMI 
+

@@ -1,0 +1,2 @@
+警告信息：
+In apply(clean_pheno, 2, as.numeric) : 强制改变过程中产生了NA
