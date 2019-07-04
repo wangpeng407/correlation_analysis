@@ -39,7 +39,7 @@ for(pk in package_list){
   } 
 } 
 
-for(fl in c(opt$taxa_abund, opt$pheno, opt$taxa_info)){
+for(fl in c(opt$taxa_abund, opt$pheno)){
   if(is.null(fl) | !file.exists(fl)){
     cat("WARNING:", fl, " not exist!\n")
     quit()
@@ -48,9 +48,10 @@ for(fl in c(opt$taxa_abund, opt$pheno, opt$taxa_info)){
 if(is.na(file.info(opt$outdir)$isdir)) dir.create(opt$outdir, recursive = TRUE)
 
 micro <- read.table(opt$taxa_abund, sep = '\t', header = T, row.names = 1, stringsAsFactors = F)
+
+#if(!is.null(opt$trans)){micro <- as.data.frame(t(micro))}
+
 pheno <- read.table(opt$pheno, sep = '\t', header = T, blank.lines.skip =  F, stringsAsFactors = F)
-taxa_map <- read.table(opt$taxa_info, sep = '\t', header = F, stringsAsFactors = F)
-colnames(taxa_map) <- c('taxa', 'map')
 
 env.name <- colnames(pheno)
 #remove vars contain 10% nas
@@ -67,7 +68,7 @@ cat("Vars contain >= 10% NA:", na10.vars, "\n\n")
 cat("Vars with non-variatiton:",nonvaried.vars,"\n\n")
 
 #seperate binary and numerical vars
-btf <- find_binary_var_index(clean_pheno)
+btf <- find_binary_var_index(clean_pheno, 2)
 all.vars <- colnames(clean_pheno)
 if(any(btf)){
 	binary_pheno <- clean_pheno[,btf, drop=FALSE]
@@ -93,14 +94,18 @@ if(is.integer(opt$top_taxa)){
 }else{
   top_micro <- as.data.frame(t(clean_micro))
 }
-  
-top_taxa_map <- taxa_map[match(colnames(top_micro), taxa_map$taxa), ]
-#get annotation colors
-annotation = data.frame(Note=factor(top_taxa_map$map))
-rownames(annotation) <- top_taxa_map$taxa
-ann_col <- getRandomColor(length(unique(annotation$Note)))
-names(ann_col) <- unique(annotation$Note)
-
+if(!is.null(opt$taxa_info)) {
+	taxa_map <- read.table(opt$taxa_info, sep = '\t', header = F, stringsAsFactors = F)
+	colnames(taxa_map) <- c('taxa', 'map')
+	top_taxa_map <- taxa_map[match(colnames(top_micro), taxa_map$taxa), ]
+	#get annotation colors
+	annotation = data.frame(Note=factor(top_taxa_map$map))
+	rownames(annotation) <- top_taxa_map$taxa
+	ann_col <- getRandomColor(length(unique(annotation$Note)))
+	names(ann_col) <- unique(annotation$Note)
+}else{
+	annotation <- ann_col <- NULL	
+}
 #caculate correlation matrix
 if(!is.null(numerical_pheno)){
 	res <- corr.test(top_micro, numerical_pheno, method = opt$corr_method, adjust = 'BH')
@@ -114,7 +119,7 @@ if(!is.null(numerical_pheno)){
 	outfig1 <- paste(opt$outdir, '/', opt$prefix, 'numerical.cor.heat.pdf', sep = '')
 	pheatmap(rmat, color = colorRampPalette(c("navy", "white", "firebrick3"))(50),
          	display_numbers = matrix(ifelse(pmat>0.01&pmat<0.05, '*',ifelse(pmat<=0.01, '**', ' ')),nrow = nrow(pmat)),
-	        annotation_row = annotation, border_color = NA,
+	        annotation_row = annotation, border_color = NA, fontsize=12, fontsize_number=10,
 	        annotation_colors = list(Note = ann_col), number_color = 'black',
 		    filename = outfig1, width = width1, height = height)
 }
@@ -122,7 +127,7 @@ if(!is.null(numerical_pheno)){
 if(!is.null(binary_pheno)){
 	stat_mean <- apply(top_micro, 2, w.res.get, restype = 'statistics', binary_mat = binary_pheno, stat_mean = T)
 	stat_mean.mat <- ldply(stat_mean, data.frame)
-	names(stat_mean.mat) <- c('Taxa_id', 'Env_id', 'Type', 'Diff_mean', 'W-statistics', 'p-value')
+	names(stat_mean.mat) <- c('Taxa_id', 'Env_id', 'Type', 'Diff_mean', 'W-statistics', 'p-value', 'q-value')
 	outfile1 <- paste(opt$outdir, '/', opt$prefix, 'wilcox.test.diff.mean.xls', sep = '')
 	write.table(stat_mean.mat, file = outfile1, quote = F, sep = '\t', row.names = F)
 
@@ -137,28 +142,34 @@ if(!is.null(binary_pheno)){
 	pheatmap(wmat, scale = 'column', color = colorRampPalette(c("navy", "white", "firebrick3"))(50),
          display_numbers = matrix(ifelse(p.mat>0.01&p.mat<0.05, '*',ifelse(p.mat<=0.01, '**', ' ')),nrow = nrow(p.mat)),
          number_color = 'black', annotation_row = annotation, border_color = 'NA',
-         annotation_colors = list(Note = ann_col),
+         annotation_colors = list(Note = ann_col), fontsize=12, fontsize_number=3,
          filename = outfig3, width = width, height = height)
 }
-
+size = 15
 if(!is.null(numerical_pheno)){
 	pca <- rda(top_micro, scale = T)
 	nmds <- metaMDS(top_micro, distance = 'bray', k=2, try = 100, trace = 0)
 	for(res in c('pca', 'nmds')){
-  		evnfit.res <- envfit(pca, numerical_pheno)
+		tmp <- get(res)
+  		evnfit.res <- envfit(tmp, numerical_pheno)
 	    sign = ifelse(evnfit.res$vectors$pvals <= 0.01, '**', ifelse(evnfit.res$vectors$pvals >0.01 & evnfit.res$vectors$pvals <=0.05, '*', ' '))
 	    pd.ef <- data.frame(
 		    env = names(evnfit.res$vectors$r), r2 = evnfit.res$vectors$r, 
 		    pval = evnfit.res$vectors$pvals,
 	    	pos = evnfit.res$vectors$r +  0.02*max(evnfit.res$vectors$r),
 		    sign = sign)
+	  levels(pd.ef$sign) <- c(" ", "*", "**")
 	  p <- 
 	    ggplot(pd.ef, aes(reorder(env, r2), r2, fill = sign, color = sign)) + 
     	geom_bar(stat = 'identity', color = 'white', width = 1, show.legend = FALSE) +
 	    scale_fill_manual(values = c('grey30', 'lightseagreen', 'limegreen')) +
     	xlab('') + 
-	    geom_text(aes(reorder(env, r2), pos), label = pd.ef$sign, angle = 90, size = 5, color = 'firebrick1', show.legend = FALSE)+
-    	coord_flip()
+	    geom_text(aes(reorder(env, r2), pos), label = pd.ef$sign, angle = 90, size = 8, color = 'firebrick1', show.legend = FALSE)+
+    	coord_flip() + 
+		theme(
+			 axis.text = element_text(size = size),
+			 axis.title = element_text(size = size+3)
+		)
 	  outfile <- data.frame( env = pd.ef$env, r2 = pd.ef$r2, pval = pd.ef$pval, sign = sign)
 	  outfile2 <- paste(opt$outdir, '/', opt$prefix, res, '.envfit.xls', sep = '')
 	  write.table(outfile, file = outfile2, sep = '\t', quote = F, row.names = F)
