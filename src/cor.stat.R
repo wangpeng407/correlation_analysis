@@ -1,4 +1,3 @@
-
 filter_by_abun_freq <- function(dt, low_freq = 0.1, low_abun = 1e-04)
 {
   freq <- apply(dt, 1, function(x) sum(sign(x))/length(x))
@@ -28,11 +27,11 @@ na.replace <- function(vec){
 }
 
 ###find the index of binary var in a mat
-find_binary_var_index <- function(mat){
+find_binary_var_index <- function(mat, levels=2){
   n.vars <- ncol(mat)
   res <- rep(NA, n.vars)
   for(i in 1:n.vars){
-    if(length(levels(factor(mat[, i]))) == 2){
+    if(length(levels(factor(mat[, i]))) <= levels){
       res[i] <- TRUE
     }else{
       res[i] <- FALSE
@@ -54,7 +53,7 @@ top_choose <- function(mat, margin = 1, FUN = "mean", top = 10){
 
 ###
 w.res.get <- function(var, restype = c('statistics', 'p.value'), 
-                      binary_mat, stat_mean = FALSE){
+                      binary_mat, stat_mean = FALSE, adjust = TRUE){
   restype <- match.arg(restype)
   n.bm <- ncol(binary_mat)
   w <- p <- diff.type <- diff.res <- vector(length = n.bm)
@@ -67,14 +66,19 @@ w.res.get <- function(var, restype = c('statistics', 'p.value'),
     diff.type[i] <- paste0(mean.res[1,1],'-',mean.res[2,1])
     diff.res[i] <- mean.res[1,2] - mean.res[2,2]
   }
-  diff_R <- data.frame(var = colnames(binary_mat), diff.type, diff.res, w, p)
+  q = p.adjust(p, 'BH')
+  diff_R <- data.frame(var = colnames(binary_mat), diff.type, diff.res, w, p, q)
   if(stat_mean){
     return(diff_R)
   }else{
     if(restype == 'statistics'){
       return(w)
     }else if(restype == 'p.value'){
-      return(p)
+      if(adjust){
+	  	return(q)
+	  }else{
+		return(p)
+	  }
     }else{
       return(0)
     }
