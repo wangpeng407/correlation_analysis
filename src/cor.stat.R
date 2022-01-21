@@ -1,9 +1,10 @@
+
 filter_by_abun_freq <- function(dt, low_freq = 0.1, low_abun = 1e-04)
 {
   freq <- apply(dt, 1, function(x) sum(sign(x))/length(x))
   avg_abun <- apply(dt, 1, mean)
   dt2 <- data.frame(dt, freq = freq, avg_abun = avg_abun)
-  data <- dt2[dt2$freq >= low_freq & dt2$avg_abun >= low_abun, ]
+  data <- dt2[dt2$freq > low_freq & dt2$avg_abun > low_abun, ]
   data$freq <- NULL
   data$avg_abun <- NULL
   return(data)
@@ -91,6 +92,12 @@ stat_mat_get <- function(micro, binary_mat){
   rownames(WMAT) <- colnames(binary_mat)
   rownames(PMAT) <- colnames(binary_mat)
   return(list(WMAT = WMAT, PMAT = PMAT))
+}
+
+clr <- function(vec){
+  # in a sample
+  GM <- exp(mean(log(vec), na.rm = T))
+  return(log( vec / GM, base = 10))
 }
 
 #
